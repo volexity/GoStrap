@@ -1,0 +1,1 @@
+"""GoStrap's test cases."""

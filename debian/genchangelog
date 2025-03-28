@@ -1,0 +1,8 @@
+#!/bin/bash
+
+export DEBEMAIL=${DEBEMAIL:-services-admin@volexity.com}
+export DEBFULLNAME=${DEBFULLNAME:-Volexity NSS}
+export DEBDIST=${DEBDIST:-volexity-`lsb_release -sc`}
+
+rm -f debian/changelog
+dch --create --package python3-volexity-gostrap --vendor volexity --distribution ${DEBDIST} --force-distribution -v `hatchling version`~`lsb_release -sr` 'See repository...'

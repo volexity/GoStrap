@@ -1,0 +1,1 @@
+"""Configurable GO sample generator."""
