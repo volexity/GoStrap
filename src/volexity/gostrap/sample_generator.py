@@ -55,7 +55,7 @@ class SampleGenerator:
         """
         # Initialise the storage paths topology.
         self._storage_base: Final[Path] = storage_path.resolve()
-        self._storage_git: Final[Path] = self._storage_base / "git_project_manager/golang"
+        self._storage_git: Final[Path] = self._storage_base / "gostrap/golang"
         self._storage_build: Final[Path] = self._storage_base / "build"
 
         # Ensure the above paths are available on disk.
@@ -66,7 +66,7 @@ class SampleGenerator:
         self._display_progress = display_progress
 
         # Initialize the underlying git project manager.
-        self._git_project_manager: Final[GitToolFetcher] = GitToolFetcher(
+        self._git_tool_fetcher: Final[GitToolFetcher] = GitToolFetcher(
             GO_REPO_NAME,
             self._storage_git,
             bin_path=Path("bin"),
@@ -87,7 +87,7 @@ class SampleGenerator:
         logger.debug(f"Installing from: {archive_data_path}")
 
         try:
-            command: Final[list[str]] = ["cmd", "make.bat"] if os.name == "nt" else ["/bin/bash", "make.bash"]
+            command: Final[list[str]] = ["cmd", "/C", "make.bat"] if os.name == "nt" else ["/bin/bash", "make.bash"]
             subprocess.check_output(command, cwd=str(archive_data_path / "src"), stderr=subprocess.STDOUT)  # noqa: S603
             archive_data_path.rename(install_path)
         except subprocess.CalledProcessError as e:
@@ -108,14 +108,14 @@ class SampleGenerator:
 
         Returns: A list of the currently installed GO versions strings.
         """
-        return self._git_project_manager.list_installed()
+        return self._git_tool_fetcher.list_installed()
 
     def get_available_go_versions(self) -> Iterable[str]:
         """Returns the list of availavle GO version to install.
 
         Returns: A list of available GO versions.
         """
-        return self._git_project_manager.list_available(refresh=False)
+        return self._git_tool_fetcher.list_available(refresh=False)
 
     def add_go_version(self, *versions: str, force: bool = False) -> list[str]:
         """Selects an additional GO version (and installs it if missing).
@@ -126,7 +126,7 @@ class SampleGenerator:
 
         Returns: The list of successfuly installed Go versions.
         """
-        return [version for version in versions if self._git_project_manager.install(version, force=force)]
+        return [version for version in versions if self._git_tool_fetcher.install(version, force=force)]
 
     def del_go_version(self, *versions: str) -> None:
         """Remove some GO version from the selection.
@@ -135,7 +135,7 @@ class SampleGenerator:
             versions: List of the GO version to remove from the selection.
         """
         for version in versions:
-            self._git_project_manager.uninstall(version)
+            self._git_tool_fetcher.uninstall(version)
 
     def _build_binary(
         self,
@@ -163,7 +163,7 @@ class SampleGenerator:
         # Set paths
         source_path = source_path.resolve()
         obj_path: Path = build_dir / f"{sample_name}{bin_type}"
-        go_root: Path | None = self._git_project_manager.get_tool_path(go_version)
+        go_root: Path | None = self._git_tool_fetcher.get_tool_path(go_version)
 
         if go_root:
             # TODO: Handle non-explicit building.
@@ -177,12 +177,12 @@ class SampleGenerator:
             if self._display_progress:
                 with yaspin() as spinner:
                     spinner.color = "green"
-                    spinner.text = "Building with GO version {go_version} ..."
-                    self._git_project_manager.run(
+                    spinner.text = f"Building with GO version {go_version} ..."
+                    self._git_tool_fetcher.run(
                         go_version, "go", "build", "-o", str(obj_path), str(source_path), env=env
                     )
             else:
-                self._git_project_manager.run(go_version, "go", "build", "-o", str(obj_path), str(source_path), env=env)
+                self._git_tool_fetcher.run(go_version, "go", "build", "-o", str(obj_path), str(source_path), env=env)
 
             return obj_path
         return None
