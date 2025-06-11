@@ -38,20 +38,25 @@ class CLIArguments:
             parser.print_usage()
             sys.exit()
 
+        # Sanity check: using set conversion to remove duplicates
         self._libs: Final[list[str]] = (
-            [lib for row in (libs.split(",") for libs in parsed_args.libs) for lib in row] if parsed_args.libs else []
+            list(set([lib for row in (libs.split(",") for libs in parsed_args.libs) for lib in row])) 
+            if parsed_args.libs
+            else []
         )
 
         self._go_versions: Final[list[str]] = (
-            [ver for row in (go.split(",") for go in parsed_args.go) for ver in row] if parsed_args.go else []
+            list(set([ver for row in (go.split(",") for go in parsed_args.go) for ver in row])) 
+            if parsed_args.go
+            else []
         )
 
-        self._arch: Final[ArchTypes | None] = ArchTypes(parsed_args.arch) if parsed_args.arch else None
+        self._arch: Final[ArchTypes | None] = ArchTypes[parsed_args.arch.upper()] if parsed_args.arch else None
         self._platform: Final[PlatformTypes | None] = (
-            PlatformTypes(parsed_args.platform) if parsed_args.platform else None
+            PlatformTypes[parsed_args.platform.upper()] if parsed_args.platform else None
         )
         self._output: Final[list[Path]] = (
-            [Path(path).resolve() for row in (out_path.split(",") for out_path in parsed_args.output) for path in row]
+            list(set([Path(path).resolve() for row in (out_path.split(",") for out_path in parsed_args.output) for path in row]))
             if parsed_args.output
             else []
         )
@@ -68,7 +73,7 @@ class CLIArguments:
 
     @property
     def go_versions(self) -> list[str]:
-        """Returns the targetted GO version.
+        """Returns the targeted GO version.
 
         Returns: GO versions to build with.
         """
@@ -100,7 +105,7 @@ class CLIArguments:
 
     @property
     def force(self) -> bool:
-        """Return wether samples should be forced built.
+        """Return whether samples should be forced built.
 
         Returns: Whether samples should be forced built.
         """
@@ -108,7 +113,7 @@ class CLIArguments:
 
     @property
     def show(self) -> bool:
-        """Returns wether to show available GO versions.
+        """Returns whether to show available GO versions.
 
         Returns: Whether to show available GO versions.
         """

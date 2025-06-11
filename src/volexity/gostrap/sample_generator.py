@@ -51,9 +51,9 @@ class SampleGenerator:
 
         Args:
             storage_path: The top level storage directory allocated to the SampleGenerator.
-            display_progress: Weather to output progress updates to the console.
+            display_progress: Whether to output progress updates to the console.
         """
-        # Initialise the storage paths topology.
+        # Initialize the storage paths topology.
         self._storage_base: Final[Path] = storage_path.resolve()
         self._storage_git: Final[Path] = self._storage_base / "gostrap/golang"
         self._storage_build: Final[Path] = self._storage_base / "build"
@@ -111,7 +111,7 @@ class SampleGenerator:
         return self._git_tool_fetcher.list_installed()
 
     def get_available_go_versions(self) -> Iterable[str]:
-        """Returns the list of availavle GO version to install.
+        """Returns the list of available GO version to install.
 
         Returns: A list of available GO versions.
         """
@@ -193,6 +193,7 @@ class SampleGenerator:
         source_path: Path,
         out_path: Path | None,
         version: str,
+        fetcher: GitToolFetcher,
         lib_list: list[str],
         arch: ArchTypes,
         platform: PlatformTypes,
@@ -203,7 +204,7 @@ class SampleGenerator:
         """Build a clean sample.
 
         Args:
-            build_queue: Outgoing queue of tupples (version, path) of the generated clean samples.
+            build_queue: Outgoing queue of tuples (version, path) of the generated clean samples.
             source_path: Path to the source file to build for the selected GO version.
             out_path: Optional override of the newly built sample path.
             version: Version of GO to build the source file for.
@@ -213,6 +214,10 @@ class SampleGenerator:
             build_dir: Path where to store the generated samples (if any).
             force: Force re-build all samples.
         """
+
+        # Installs version in parallel for each build process 
+        fetcher.install(version, force=force)
+
         sample_name: Final[str] = urlsafe_b64encode(f"{version}.{platform}.{','.join(lib_list)}".encode()).decode()
         # Test if already built
         if not force:
@@ -272,7 +277,7 @@ class SampleGenerator:
             force: Force re-build all samples.
 
         Returns:
-            list[tuple[str, Path]] : List of tupples (version, path) of the generated clean samples.
+            list[tuple[str, Path]] : List of tuples (version, path) of the generated clean samples.
         """
         source_path: Final[Path] = self._storage_build / "main.go"
 
@@ -283,20 +288,33 @@ class SampleGenerator:
         # Set default values
         if not arch:
             try:
-                arch = ArchTypes(sysplatform.machine())
+                arch = ArchTypes[sysplatform.machine().upper()]
             except ValueError:
                 arch = ArchTypes.AMD64
         if not platform:
             try:
-                platform = PlatformTypes(sysplatform.system())
+                platform = PlatformTypes[sysplatform.system().upper()]
             except ValueError:
                 platform = PlatformTypes.WINDOWS
         if not build_dir:
             build_dir = self._storage_build
         lib_list: Final[list[str]] = list(libs) if len(libs) else DEFAULT_LIBS
 
+        # Generates list fetchers to use in Process
+        gtf_list: list[GitToolFetcher] = []
+
+        for i in range(len(go_versions)):
+            gtf_list.append(GitToolFetcher(
+                GO_REPO_NAME,
+                self._storage_git,
+                bin_path=Path("bin"),
+                install_callback=self._go_install_proc,
+                uninstall_callback=self._go_uninstall_proc,
+                display_progress=True
+            ))
+
         # Ensure each go version is installed.
-        go_versions = self.add_go_version(*go_versions, force=force)
+        # go_versions = self.add_go_version(*go_versions, force=force)
 
         if not out_paths:
             out_paths = []
@@ -316,6 +334,7 @@ class SampleGenerator:
                     "source_path": source_path,
                     "out_path": out_path,
                     "version": version,
+                    "fetcher": fetcher,
                     "lib_list": lib_list,
                     "arch": arch,
                     "platform": platform,
@@ -323,8 +342,9 @@ class SampleGenerator:
                     "force": force,
                 },
             )
-            for version, out_path in zip_longest(go_versions, out_paths)
+            for fetcher, version, out_path in zip_longest(gtf_list, go_versions, out_paths)
         ]
+
         for process in process_pool:
             process.start()
 
