@@ -69,9 +69,7 @@ packages = ["src/volexity"]
 [tool.hatch.envs.default]
 extra-dependencies = [
   "mypy~=1.13",
-
   "types-requests",
-  "types-tqdm",
 ]
 
 [tool.hatch.envs.types.scripts]
