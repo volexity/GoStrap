@@ -2,9 +2,20 @@
 
 GoStrap is a tool to easily bootstrp GO samples using a set of GO libraries and GO versions.
 
-## Build & Install
+## How to install
 
-To build GoStrap use Hatch's usual build command :
+To install GoStrap, we recommend pulling directly from PyPi :
+
+```bash
+pip install gostrap
+```
+
+This will install GoStrap as well as its necessary dependencies.
+
+### Building from source
+
+If you wish to build & install GoStrap from source instead, use Hatch's usual build command :
+
 ```bash
 hatch build
 ```
