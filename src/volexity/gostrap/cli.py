@@ -7,6 +7,8 @@ from cmd import Cmd
 from pathlib import Path
 from typing import Final
 
+import multiprocess  # type: ignore[import-untyped]
+
 from .models.cli_arguments import CLIArguments
 from .sample_generator import SampleGenerator
 
@@ -18,10 +20,13 @@ logger: Final[logging.Logger] = logging.getLogger(__name__)
 
 def run_cli() -> None:
     """Implements the GoStrap command line interface."""
+    # Spawns fresh interpreter, avoids issues with fork() from global thread
+    multiprocess.set_start_method("spawn")
+
     args: Final[CLIArguments] = CLIArguments(sys.argv)
 
     storage_path: Final[Path] = Path("./storage")
-    libs: Final[list[str]] = args.libs if len(args.libs) else []
+    libs: Final[set[str]] = args.libs if len(args.libs) else set()
 
     sample_gen: SampleGenerator = SampleGenerator(storage_path, display_progress=True)
 
@@ -35,9 +40,6 @@ def run_cli() -> None:
         logger.error("The number of output paths cannot exceed the number of samples.")
         sys.exit()
 
-    install_paths: Final[list[tuple[str, Path]]] = sample_gen.generate(
+    sample_gen.generate(
         args.go_versions, libs, args.arch, args.platform, out_paths=args.output, force=args.force
     )
-
-    for version, path in install_paths:
-        logger.info(f'Sample for GO version "{version}" built at "{path}"')

@@ -1,5 +1,5 @@
+# OLD SAMPLE GEN, SAVE
 """Configurable GO sample generator."""
-
 import logging
 import os
 import platform as sysplatform
@@ -39,9 +39,14 @@ DEFAULT_LIBS: list[str] = [
     "unicode",
 ]
 
-logging.getLogger("volexity.gittoolfetcher").setLevel(logging.WARNING)
+logging.getLogger("volexity.gittoolfetcher").setLevel(logging.INFO)
 logger: Final[logging.Logger] = logging.getLogger(__name__)
 
+handler = logging.StreamHandler()
+formatter = logging.Formatter("\rGoStrap: %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.propagate = False
 
 class SampleGenerator:
     """Configurable GO sample generator."""
@@ -51,9 +56,9 @@ class SampleGenerator:
 
         Args:
             storage_path: The top level storage directory allocated to the SampleGenerator.
-            display_progress: Weather to output progress updates to the console.
+            display_progress: Whether to output progress updates to the console.
         """
-        # Initialise the storage paths topology.
+        # Initialize the storage paths topology.
         self._storage_base: Final[Path] = storage_path.resolve()
         self._storage_git: Final[Path] = self._storage_base / "gostrap/golang"
         self._storage_build: Final[Path] = self._storage_base / "build"
@@ -85,7 +90,6 @@ class SampleGenerator:
             install_path: The target installation path.
         """
         logger.debug(f"Installing from: {archive_data_path}")
-
         try:
             command: Final[list[str]] = ["cmd", "/C", "make.bat"] if os.name == "nt" else ["/bin/bash", "make.bash"]
             subprocess.check_output(command, cwd=str(archive_data_path / "src"), stderr=subprocess.STDOUT)  # noqa: S603
@@ -111,13 +115,13 @@ class SampleGenerator:
         return self._git_tool_fetcher.list_installed()
 
     def get_available_go_versions(self) -> Iterable[str]:
-        """Returns the list of availavle GO version to install.
+        """Returns the list of available GO version to install.
 
         Returns: A list of available GO versions.
         """
         return self._git_tool_fetcher.list_available(refresh=False)
 
-    def add_go_version(self, *versions: str, force: bool = False) -> list[str]:
+    def add_go_versions(self, *versions: str, force: bool = False) -> list[str]:
         """Selects an additional GO version (and installs it if missing).
 
         Args:
@@ -126,7 +130,7 @@ class SampleGenerator:
 
         Returns: The list of successfuly installed Go versions.
         """
-        return [version for version in versions if self._git_tool_fetcher.install(version, force=force)]
+        return self._git_tool_fetcher.install(*versions, force=force)
 
     def del_go_version(self, *versions: str) -> None:
         """Remove some GO version from the selection.
@@ -173,16 +177,7 @@ class SampleGenerator:
                 "GOOS": platform,
             }
 
-            # Build
-            if self._display_progress:
-                with yaspin() as spinner:
-                    spinner.color = "green"
-                    spinner.text = f"Building with GO version {go_version} ..."
-                    self._git_tool_fetcher.run(
-                        go_version, "go", "build", "-o", str(obj_path), str(source_path), env=env
-                    )
-            else:
-                self._git_tool_fetcher.run(go_version, "go", "build", "-o", str(obj_path), str(source_path), env=env)
+            self._git_tool_fetcher.run(go_version, "go", "build", "-o", str(obj_path), str(source_path), env=env)
 
             return obj_path
         return None
@@ -203,7 +198,7 @@ class SampleGenerator:
         """Build a clean sample.
 
         Args:
-            build_queue: Outgoing queue of tupples (version, path) of the generated clean samples.
+            build_queue: Outgoing queue of tuples (version, path) of the generated clean samples.
             source_path: Path to the source file to build for the selected GO version.
             out_path: Optional override of the newly built sample path.
             version: Version of GO to build the source file for.
@@ -220,12 +215,15 @@ class SampleGenerator:
                 if sample_name == built_sample_path.stem:
                     logger.debug(f'GO sample for "{version}" is already generated. Skipping ...')
                     build_queue.put((version, built_sample_path))
+                    logger.info(f"\033[32m✔\033[0m Go version {version} already built at {built_sample_path}.")
                     return
         # If not then build it
+        logger.info(f"Building Go version {version}...")
         if sample_path := self._build_binary(source_path, sample_name, version, arch, platform, build_dir):
             if out_path:
                 sample_path = sample_path.rename(out_path)
             build_queue.put((version, sample_path))
+        logger.info(f"\033[32m✔\033[0m Go version {version} built at {sample_path}.")
 
     @staticmethod
     def _build_source(path: Path, libs: list[str]) -> None:
@@ -251,20 +249,20 @@ class SampleGenerator:
 
     def generate(
         self,
-        go_versions: list[str],
-        libs: list[str],
+        go_versions: Iterable[str],
+        libs: Iterable[str],
         arch: ArchTypes | None = None,
         platform: PlatformTypes | None = None,
         *,
-        out_paths: list[Path] | None = None,
+        out_paths: Iterable[Path] | None = None,
         build_dir: Path | None = None,
         force: bool = False,
     ) -> list[tuple[str, Path]]:
         """Generate and build samples with the specified libraries and for the target architecture.
 
         Args:
-            go_versions: List of go versions to generate samples for.
-            libs: List of libs to include in the generated sample.
+            go_versions: Iterable of go versions to generate samples for.
+            libs: Iterable of libs to include in the generated sample.
             arch: Target build architecture (Host architecture if None).
             platform: Target operating system.
             out_paths: Optional list of paths to copy each sample to.
@@ -272,7 +270,7 @@ class SampleGenerator:
             force: Force re-build all samples.
 
         Returns:
-            list[tuple[str, Path]] : List of tupples (version, path) of the generated clean samples.
+            list[tuple[str, Path]] : List of tuples (version, path) of the generated clean samples.
         """
         source_path: Final[Path] = self._storage_build / "main.go"
 
@@ -283,58 +281,64 @@ class SampleGenerator:
         # Set default values
         if not arch:
             try:
-                arch = ArchTypes(sysplatform.machine())
+                arch = ArchTypes[sysplatform.machine().upper()]
             except ValueError:
                 arch = ArchTypes.AMD64
         if not platform:
             try:
-                platform = PlatformTypes(sysplatform.system())
+                platform = PlatformTypes[sysplatform.system().upper()]
             except ValueError:
                 platform = PlatformTypes.WINDOWS
         if not build_dir:
             build_dir = self._storage_build
-        lib_list: Final[list[str]] = list(libs) if len(libs) else DEFAULT_LIBS
-
-        # Ensure each go version is installed.
-        go_versions = self.add_go_version(*go_versions, force=force)
+        lib_list: Final[list[str]] = list(libs) if libs else DEFAULT_LIBS
 
         if not out_paths:
             out_paths = []
 
-        # Generate the sample source file
-        SampleGenerator._build_source(source_path, lib_list)
+        # Ensure each go version is installed.
+        versions: list[str] = self.add_go_versions(*go_versions, force=force)
 
-        # IPC Queue.
-        build_queue: Queue = Queue()
+        with yaspin() as spinner:
+            spinner.color = "green"
 
-        # Build for each go version
-        process_pool: Final[list[Process]] = [
-            Process(
-                target=self._build_process,
-                kwargs={
-                    "build_queue": build_queue,
-                    "source_path": source_path,
-                    "out_path": out_path,
-                    "version": version,
-                    "lib_list": lib_list,
-                    "arch": arch,
-                    "platform": platform,
-                    "build_dir": build_dir,
-                    "force": force,
-                },
-            )
-            for version, out_path in zip_longest(go_versions, out_paths)
-        ]
-        for process in process_pool:
-            process.start()
+            # Generate the sample source file
+            SampleGenerator._build_source(source_path, lib_list)
 
-        # Wait for the process to complete
-        for process in process_pool:
-            process.join()
+            logger.info("\033[1mBUILD\033[0m")
 
-        build_list: Final[list[tuple[str, Path]]] = []
-        while not build_queue.empty():
-            build_list.append(build_queue.get())
+            # IPC Queue.
+            build_queue: Queue = Queue()
 
-        # Strip the list of null values
-        return build_list
+            # Build for each go version
+            process_pool: Final[list[Process]] = [
+                Process(
+                    target=self._build_process,
+                    kwargs={
+                        "build_queue": build_queue,
+                        "source_path": source_path,
+                        "out_path": out_path,
+                        "version": version,
+                        "lib_list": lib_list,
+                        "arch": arch,
+                        "platform": platform,
+                        "build_dir": build_dir,
+                        "force": force,
+                    },
+                )
+                for version, out_path in zip_longest(versions, out_paths)
+            ]
+
+            for process in process_pool:
+                process.start()
+
+            # Wait for the process to complete
+            for process in process_pool:
+                process.join()
+
+            build_list: Final[list[tuple[str, Path]]] = []
+            while not build_queue.empty():
+                build_list.append(build_queue.get())
+
+            # Strip the list of null values
+            return build_list
