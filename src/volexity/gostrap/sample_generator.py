@@ -1,5 +1,6 @@
 # OLD SAMPLE GEN, SAVE
 """Configurable GO sample generator."""
+
 import logging
 import os
 import platform as sysplatform
@@ -47,6 +48,7 @@ formatter = logging.Formatter("\rGoStrap: %(message)s")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.propagate = False
+
 
 class SampleGenerator:
     """Configurable GO sample generator."""

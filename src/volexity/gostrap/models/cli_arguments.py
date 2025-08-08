@@ -40,15 +40,13 @@ class CLIArguments:
 
         # Sanity check: using set comprehension to remove duplicates
         self._libs: Final[set[str]] = (
-            { lib for row in (libs.split(",") for libs in parsed_args.libs) for lib in row }
+            {lib for row in (libs.split(",") for libs in parsed_args.libs) for lib in row}
             if parsed_args.libs
             else set()
         )
 
         self._go_versions: Final[set[str]] = (
-            { ver for row in (go.split(",") for go in parsed_args.go) for ver in row }
-            if parsed_args.go
-            else set()
+            {ver for row in (go.split(",") for go in parsed_args.go) for ver in row} if parsed_args.go else set()
         )
 
         self._arch: Final[ArchTypes | None] = ArchTypes[parsed_args.arch.upper()] if parsed_args.arch else None
@@ -56,7 +54,7 @@ class CLIArguments:
             PlatformTypes[parsed_args.platform.upper()] if parsed_args.platform else None
         )
         self._output: Final[set[Path]] = (
-            { Path(path).resolve() for row in (out_path.split(",") for out_path in parsed_args.output) for path in row }
+            {Path(path).resolve() for row in (out_path.split(",") for out_path in parsed_args.output) for path in row}
             if parsed_args.output
             else set()
         )

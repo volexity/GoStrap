@@ -40,6 +40,4 @@ def run_cli() -> None:
         logger.error("The number of output paths cannot exceed the number of samples.")
         sys.exit()
 
-    sample_gen.generate(
-        args.go_versions, libs, args.arch, args.platform, out_paths=args.output, force=args.force
-    )
+    sample_gen.generate(args.go_versions, libs, args.arch, args.platform, out_paths=args.output, force=args.force)
