@@ -9,12 +9,17 @@ from base64 import urlsafe_b64encode
 from collections.abc import Iterable
 from itertools import zip_longest
 from pathlib import Path
-from typing import Final
+from typing import TYPE_CHECKING, Final, cast
 
-from multiprocess import Process, Queue  # type: ignore[import-untyped]
+import multiprocess  # type: ignore[import-untyped]
+import multiprocess.queues  # type: ignore[import-untyped]
+from multiprocess import Process
 from yaspin import yaspin
 
 from volexity.gittoolfetcher.git_tool_fetcher import GitToolFetcher
+
+if TYPE_CHECKING:
+    from volexity.gittoolfetcher.models.tool_management_result import ToolManagementResult
 
 from .models.arch_types import ArchTypes
 from .models.platform_types import PlatformTypes
@@ -83,7 +88,7 @@ class SampleGenerator:
         )
 
     @staticmethod
-    def _go_install_proc(version: str, archive_data_path: Path, install_path: Path) -> None:  # noqa: ARG004
+    def _go_install_proc(_version: str, archive_data_path: Path, install_path: Path) -> None:
         """Callback procedure to install a GO version.
 
         Args:
@@ -94,13 +99,13 @@ class SampleGenerator:
         logger.debug(f"Installing from: {archive_data_path}")
         try:
             command: Final[list[str]] = ["cmd", "/C", "make.bat"] if os.name == "nt" else ["/bin/bash", "make.bash"]
-            subprocess.check_output(command, cwd=str(archive_data_path / "src"), stderr=subprocess.STDOUT)  # noqa: S603
+            subprocess.check_output(command, cwd=str(archive_data_path / "src"), text=True, stderr=subprocess.STDOUT)  # noqa: S603
             archive_data_path.rename(install_path)
         except subprocess.CalledProcessError as e:
-            logger.exception(f"CalledProcessError : \n\n{e.output.decode()}\n\n")
+            logger.exception(f"CalledProcessError : \n\n{e.stdout}\n\n")
 
     @staticmethod
-    def _go_uninstall_proc(version: str, install_path: Path) -> None:  # noqa: ARG004
+    def _go_uninstall_proc(_version: str, install_path: Path) -> None:
         """Callback procedure to remove a GO version.
 
         Args:
@@ -132,7 +137,8 @@ class SampleGenerator:
 
         Returns: The list of successfuly installed Go versions.
         """
-        return self._git_tool_fetcher.install(*versions, force=force)
+        install_result: list[ToolManagementResult] = self._git_tool_fetcher.install(*versions, force=force)
+        return [result.version for result in install_result if result.status]
 
     def del_go_version(self, *versions: str) -> None:
         """Remove some GO version from the selection.
@@ -140,8 +146,7 @@ class SampleGenerator:
         Args:
             versions: List of the GO version to remove from the selection.
         """
-        for version in versions:
-            self._git_tool_fetcher.uninstall(version)
+        self._git_tool_fetcher.uninstall(*versions)
 
     def _build_binary(
         self,
@@ -186,7 +191,7 @@ class SampleGenerator:
 
     def _build_process(
         self,
-        build_queue: Queue,
+        build_queue: multiprocess.queues.Queue[tuple[str, Path]],
         source_path: Path,
         out_path: Path | None,
         version: str,
@@ -309,9 +314,9 @@ class SampleGenerator:
 
             logger.info("\033[1mBUILD\033[0m")
 
-            # IPC Queue.
-            build_queue: Queue = Queue()
-
+            build_queue: multiprocess.queues.Queue[tuple[str, Path]] = cast(
+                "multiprocess.queues.Queue[tuple[str, Path]]", multiprocess.Queue()
+            )
             # Build for each go version
             process_pool: Final[list[Process]] = [
                 Process(
