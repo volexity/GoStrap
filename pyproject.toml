@@ -25,9 +25,9 @@ classifiers = [
 ]
 dependencies = [
   "argparse~=1.4.0",
-  "gittoolfetcher~=1.2.0",
+  "gittoolfetcher~=1.2.1",
   "multiprocess~=0.70.17",
-  "yaspin~=3.1.0",
+  "yaspin~=3.4.0",
 ]
 
 [project.scripts]

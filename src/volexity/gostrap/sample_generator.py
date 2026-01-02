@@ -5,6 +5,7 @@ import logging
 import os
 import platform as sysplatform
 import subprocess
+import sys
 from base64 import urlsafe_b64encode
 from collections.abc import Iterable
 from itertools import zip_longest
@@ -306,7 +307,7 @@ class SampleGenerator:
         # Ensure each go version is installed.
         versions: list[str] = self.add_go_versions(*go_versions, force=force)
 
-        with yaspin() as spinner:
+        with yaspin(stream=sys.stderr) as spinner:
             spinner.color = "green"
 
             # Generate the sample source file
